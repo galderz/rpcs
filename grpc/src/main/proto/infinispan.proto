@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package rpcs.grpc.infinispan;
+
+service Infinispan {
+  rpc put (KeyValue) returns (Empty) {}
+  rpc get (Key) returns (Value) {}
+}
+
+message KeyValue {
+  string cacheName = 1;
+  string key = 2;
+  string value = 3;
+}
+
+message Key {
+  string cacheName = 1;
+  string key = 2;
+}
+
+// TODO How to represent a Maybe?
+message Value {
+  string value = 1;
+}
+
+message Empty {
+}

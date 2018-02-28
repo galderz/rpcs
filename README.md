@@ -18,6 +18,14 @@ mvn package exec:java -Dexec.mainClass=rpcs.grpc.infinispan.InfinispanServer
 mvn package exec:java -Dexec.mainClass=rpcs.grpc.infinispan.InfinispanClient
 ```
 
+## aeron
+
+### hello world
+
+Run `io.aeron.samples.LowLatencyMediaDriver`
+Run `rpcs.aeron.hello.BasicPublisher`
+Run `rpcs.aeron.hello.BasicSubscriber` 
+
 # TODOs 
 
 - [ ] Add tracing/telemetry

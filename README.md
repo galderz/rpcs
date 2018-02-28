@@ -23,8 +23,13 @@ mvn package exec:java -Dexec.mainClass=rpcs.grpc.infinispan.InfinispanClient
 ### hello world
 
 Run `io.aeron.samples.LowLatencyMediaDriver`
+
 Run `rpcs.aeron.hello.BasicPublisher`
-Run `rpcs.aeron.hello.BasicSubscriber` 
+
+Run `rpcs.aeron.hello.BasicSubscriber`
+
+Run `io.aeron.samples.AeronStat` 
+
 
 # TODOs 
 

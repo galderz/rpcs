@@ -1,5 +1,6 @@
 package rpcs.grpc.infinispan;
 
+import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
 import org.infinispan.Cache;
 import org.infinispan.configuration.cache.ConfigurationBuilder;
@@ -25,10 +26,9 @@ final class InfinispanImpl extends InfinispanGrpc.InfinispanImplBase {
    public void put(KeyValue req, StreamObserver<Empty> obs) {
       final String cacheName = req.getCacheName();
 
-      // TODO Binary cache
-      final Cache<String, String> cache = cacheContainer.getCache(cacheName);
+      final Cache<byte[], byte[]> cache = cacheContainer.getCache(cacheName);
 
-      cache.put(req.getKey(), req.getValue());
+      cache.put(req.getKey().toByteArray(), req.getValue().toByteArray());
 
       obs.onNext(Empty.newBuilder().build());
       obs.onCompleted();
@@ -38,12 +38,11 @@ final class InfinispanImpl extends InfinispanGrpc.InfinispanImplBase {
    public void get(Key req, StreamObserver<Value> obs) {
       final String cacheName = req.getCacheName();
 
-      // TODO Binary cache
-      final Cache<String, String> cache = cacheContainer.getCache(cacheName);
+      final Cache<byte[], byte[]> cache = cacheContainer.getCache(cacheName);
 
-      final String value = cache.get(req.getKey());
+      final byte[] value = cache.get(req.getKey().toByteArray());
 
-      obs.onNext(Value.newBuilder().setValue(value).build());
+      obs.onNext(Value.newBuilder().setValue(ByteString.copyFrom(value)).build());
       obs.onCompleted();
    }
 

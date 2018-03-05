@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sbe:messageSchema xmlns:sbe="http://fixprotocol.io/2016/sbe"
+                   package="rcps.aeron.infinispan.codec"
+                   id="1"
+                   version="0"
+                   semanticVersion="5.2"
+                   description="Infinispan schema"
+                   byteOrder="littleEndian">
+   <types>
+      <composite name="messageHeader"
+                 description="Message identifiers and length of message root">
+         <type name="blockLength" primitiveType="uint16"/>
+         <type name="templateId" primitiveType="uint16"/>
+         <type name="schemaId" primitiveType="uint16"/>
+         <type name="version" primitiveType="uint16"/>
+      </composite>
+      <composite name="groupSizeEncoding"
+                 description="Repeating group dimensions">
+         <type name="blockLength" primitiveType="uint16"/>
+         <type name="numInGroup" primitiveType="uint16"/>
+      </composite>
+      <composite name="varStringEncoding">
+         <type name="length" primitiveType="uint32" maxValue="1073741824"/>
+         <type name="varData" primitiveType="uint8" length="0"
+               characterEncoding="UTF-8"/>
+      </composite>
+      <composite name="varDataEncoding">
+         <type name="length" primitiveType="uint32" maxValue="1073741824"/>
+         <type name="varData" primitiveType="uint8" length="0"/>
+      </composite>
+   </types>
+   <sbe:message name="KeyValue" id="1" description="Key/value">
+      <data name="cacheName" id="1" type="varStringEncoding"/>
+      <data name="key" id="2" type="varDataEncoding"/>
+      <data name="value" id="3" type="varDataEncoding"/>
+   </sbe:message>
+   <sbe:message name="Key" id="2" description="Key">
+      <data name="cacheName" id="1" type="varStringEncoding"/>
+      <data name="key" id="2" type="varDataEncoding"/>
+   </sbe:message>
+   <sbe:message name="Empty" id="3" description="Empty">
+   </sbe:message>
+   <sbe:message name="Value" id="4" description="Value">
+      <data name="value" id="1" type="varDataEncoding"/>
+   </sbe:message>
+</sbe:messageSchema>

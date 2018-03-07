@@ -43,6 +43,8 @@ public class InfinispanAeronServer {
    static final FragmentHandler FRAGMENT_HANDLER = new FragmentAssembler(InfinispanAeronServer::onMessage);
    static final int FRAGMENT_LIMIT = 256;
 
+   static final InfinispanAeronImpl infinispan = new InfinispanAeronImpl();
+
    public static void main(String[] args) throws InterruptedException {
       Thread receiver = new Thread(new Receiver());
       receiver.start();
@@ -80,10 +82,7 @@ public class InfinispanAeronServer {
       final byte[] valueBytes = new byte[valueLength];
       KEY_VALUE_DECODER.getValue(valueBytes, 0, valueLength);
 
-      String key = new String(keyBytes);
-      String value = new String(valueBytes);
-
-      System.out.printf("[server, cache=%s] put(%s, %s)%n", cacheName, key, value);
+      infinispan.put(keyBytes, valueBytes, cacheName);
 
       final ExpandableArrayBuffer buff = new ExpandableArrayBuffer(512);
 

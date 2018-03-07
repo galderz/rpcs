@@ -14,6 +14,7 @@
 
       <aeron.version>1.8.1</aeron.version>
       <sbe.version>1.7.8</sbe.version>
+      <infinispan.version>9.2.0.Final</infinispan.version>
 
       <maven-compiler-plugin.version>3.2</maven-compiler-plugin.version>
    </properties>
@@ -33,6 +34,12 @@
          <groupId>io.aeron</groupId>
          <artifactId>aeron-samples</artifactId>
          <version>${aeron.version}</version>
+      </dependency>
+
+      <dependency>
+         <groupId>org.infinispan</groupId>
+         <artifactId>infinispan-core</artifactId>
+         <version>${infinispan.version}</version>
       </dependency>
    </dependencies>
 

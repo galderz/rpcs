@@ -3,17 +3,12 @@ package rcps.aeron.infinispan;
 import io.aeron.Aeron;
 import io.aeron.FragmentAssembler;
 import io.aeron.Publication;
-import io.aeron.Subscription;
 import io.aeron.logbuffer.FragmentHandler;
 import io.aeron.logbuffer.Header;
-import io.aeron.samples.SampleConfiguration;
 import org.agrona.DirectBuffer;
 import org.agrona.ExpandableArrayBuffer;
-import org.agrona.concurrent.BusySpinIdleStrategy;
-import org.agrona.concurrent.IdleStrategy;
 import rcps.aeron.infinispan.codec.EmptyDecoder;
 import rcps.aeron.infinispan.codec.KeyEncoder;
-import rcps.aeron.infinispan.codec.KeyValueDecoder;
 import rcps.aeron.infinispan.codec.KeyValueEncoder;
 import rcps.aeron.infinispan.codec.MessageHeaderDecoder;
 import rcps.aeron.infinispan.codec.MessageHeaderEncoder;
@@ -21,10 +16,11 @@ import rcps.aeron.infinispan.codec.ValueDecoder;
 
 import java.nio.charset.Charset;
 
-public class InfinispanAeronClient {
+import static rcps.aeron.AeronUtils.offerResult;
+import static rcps.aeron.infinispan.Constants.REQ_CHANNEL;
+import static rcps.aeron.infinispan.Constants.STREAM_ID;
 
-   private static final int STREAM_ID = 20;
-   private static final String CHANNEL = "aeron:udp?endpoint=localhost:40133";
+public class InfinispanAeronClient {
 
    private static final int FRAGMENT_LIMIT = 256;
    
@@ -41,62 +37,50 @@ public class InfinispanAeronClient {
    static final EmptyDecoder EMPTY_DECODER = new EmptyDecoder();
    static final ValueDecoder VALUE_DECODER = new ValueDecoder();
 
-   static final FragmentHandler fragmentHandler = new FragmentAssembler(InfinispanAeronClient::onMessage);
+   static final FragmentHandler FRAGMENT_HANDLER = new FragmentAssembler(InfinispanAeronClient::onMessage);
 
    static final Aeron AERON = Aeron.connect(new Aeron.Context());
-   static final Publication PUBLICATION = AERON.addPublication(CHANNEL, STREAM_ID);
-   static final Subscription SUBSCRIPTION = AERON.addSubscription(CHANNEL, STREAM_ID);
+   static final Publication PUBLICATION = AERON.addPublication(REQ_CHANNEL, STREAM_ID);
+//   static Subscription subscription;
 
-   public static void main(String[] args) {
-      final Thread receiverThread = new Thread(new Receiver());
-      receiverThread.start();
-
-      final ExpandableArrayBuffer outboundBuffer = new ExpandableArrayBuffer(512);
+   public static void main(String[] args) throws InterruptedException {
+//      subscription = AERON.addSubscription(REP_CHANNEL, STREAM_ID);
+//      System.out.println("[client] Added subscription to response channel: " + REP_CHANNEL);
+//      System.out.println("[client] Subscription connected? " + subscription.isConnected());
+//      PUBLICATION = ;
+//      System.out.println("[client] Added PUBLICATION to request channel: " + REQ_CHANNEL);
+//      System.out.println("[client] Publication connected? " + PUBLICATION.isConnected());
 
       final Charset ch = Charset.forName("UTF-8");
       final byte[] key = "hello".getBytes(ch);
       final byte[] value = "world".getBytes(ch);
 
+      final ExpandableArrayBuffer buff1 = new ExpandableArrayBuffer(512);
+
       KEY_VALUE_ENCODER
-         .wrapAndApplyHeader(outboundBuffer, 0, MSG_HEADER_ENCODER)
+         .wrapAndApplyHeader(buff1, 0, MSG_HEADER_ENCODER)
          .cacheName("test")
          .putKey(key, 0, key.length)
          .putValue(value, 0, value.length);
 
-      long result = PUBLICATION.offer(outboundBuffer, 0, KEY_VALUE_ENCODER.encodedLength());
-      handleResult(result);
+      long result = PUBLICATION.offer(buff1, 0, MSG_HEADER_ENCODER.encodedLength() + KEY_VALUE_ENCODER.encodedLength());
+      offerResult(result);
 
-      if (!PUBLICATION.isConnected()) {
-         System.out.println("No active subscribers detected");
-      }
+//      subscription.poll(FRAGMENT_HANDLER, FRAGMENT_LIMIT);
 
-      KEY_ENCODER
-         .wrapAndApplyHeader(outboundBuffer, 0, MSG_HEADER_ENCODER)
-         .cacheName("test")
-         .putKey(key, 0, key.length);
+      Thread.sleep(2000);
 
-      result = PUBLICATION.offer(outboundBuffer, (int) result, KEY_VALUE_ENCODER.encodedLength());
-      handleResult(result);
-   }
-
-   private static void handleResult(long result) {
-      if (result < 0L) {
-         if (result == Publication.BACK_PRESSURED) {
-            System.out.println("Offer failed due to back pressure");
-         } else if (result == Publication.NOT_CONNECTED) {
-            System.out.println("Offer failed because publisher is not connected to subscriber");
-         } else if (result == Publication.ADMIN_ACTION) {
-            System.out.println("Offer failed because of an administration action in the system");
-         } else if (result == Publication.CLOSED) {
-            System.out.println("Offer failed publication is closed");
-         } else if (result == Publication.MAX_POSITION_EXCEEDED) {
-            System.out.println("Offer failed due to publication reaching max position");
-         } else {
-            System.out.println("Offer failed due to unknown reason");
-         }
-      } else {
-         System.out.println("yay!");
-      }
+//      final ExpandableArrayBuffer buff2 = new ExpandableArrayBuffer(512);
+//
+//      KEY_ENCODER
+//         .wrapAndApplyHeader(buff2, 0, MSG_HEADER_ENCODER)
+//         .cacheName("test")
+//         .putKey(key, 0, key.length);
+//
+//      result = PUBLICATION.offer(buff2, (int) result, KEY_VALUE_ENCODER.encodedLength());
+//      offerResult(result);
+//
+//      SUBSCRIPTION.poll(FRAGMENT_HANDLER, FRAGMENT_LIMIT);
    }
 
    private static void onMessage(DirectBuffer buffer, int offset, int length, Header header) {
@@ -125,17 +109,6 @@ public class InfinispanAeronClient {
       final byte[] bytes = new byte[valueLength];
       VALUE_DECODER.getValue(bytes, 0, valueLength);
       System.out.printf("Get responded: %s%n", new String(bytes));
-   }
-
-   private static class Receiver implements Runnable {
-
-      @Override
-      public void run() {
-         while (true) {
-            SUBSCRIPTION.poll(fragmentHandler, FRAGMENT_LIMIT);
-         }
-      }
-
    }
 
 }

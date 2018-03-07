@@ -102,16 +102,9 @@ public class InfinispanAeronServer {
       final byte[] keyBytes = new byte[keyLength];
       KEY_DECODER.getKey(keyBytes, 0, keyLength);
 
-      System.out.printf(
-         "[server, cache=%s] get(%s)%n"
-         , cacheName
-         , Arrays.toString(keyBytes)
-      );
+      final byte[] value = infinispan.get(keyBytes, cacheName);
 
       final ExpandableArrayBuffer buff = new ExpandableArrayBuffer(512);
-
-      final Charset ch = Charset.forName("UTF-8");
-      final byte[] value = "world".getBytes(ch);
 
       VALUE_ENCODER
          .wrapAndApplyHeader(buff, 0, MSG_HEADER_ENCODER)
@@ -119,12 +112,6 @@ public class InfinispanAeronServer {
 
       long result = PUBLICATION.offer(buff, 0, MSG_HEADER_ENCODER.encodedLength() + VALUE_ENCODER.encodedLength());
       offerResult(result);
-
-      System.out.printf(
-         "[server] get(%s) replied with %s%n"
-         , Arrays.toString(keyBytes)
-         , Arrays.toString(value)
-      );
    }
 
    private static class Receiver implements Runnable {

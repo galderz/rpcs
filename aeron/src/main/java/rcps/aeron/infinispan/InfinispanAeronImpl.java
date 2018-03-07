@@ -31,4 +31,18 @@ public class InfinispanAeronImpl {
       cache.put(key, value);
    }
 
+   public byte[] get(byte[] key, String cacheName) {
+      final Cache<byte[], byte[]> cache = cacheContainer.getCache(cacheName);
+      final byte[] value = cache.get(key);
+
+      System.out.printf(
+         "[server, cache=%s] get(%s) = %s%n"
+         , cacheName
+         , Arrays.toString(key)
+         , Arrays.toString(value)
+      );
+
+      return value;
+   }
+
 }

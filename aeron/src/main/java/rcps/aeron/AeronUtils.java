@@ -19,8 +19,6 @@ public class AeronUtils {
          } else {
             System.out.println("Offer failed due to unknown reason");
          }
-      } else {
-         System.out.println("yay!");
       }
    }
 

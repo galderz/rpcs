@@ -21,6 +21,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
 import static rcps.aeron.AeronUtils.offerResult;
+import static rcps.aeron.infinispan.Constants.REP_CHANNEL;
 import static rcps.aeron.infinispan.Constants.REQ_CHANNEL;
 import static rcps.aeron.infinispan.Constants.STREAM_ID;
 
@@ -37,6 +38,7 @@ public class InfinispanAeronServer {
 
    static final Aeron AERON = Aeron.connect(new Aeron.Context());
    static final Subscription SUBSCRIPTION = AERON.addSubscription(REQ_CHANNEL, STREAM_ID);
+   static final Publication PUBLICATION = AERON.addPublication(REP_CHANNEL, STREAM_ID);
 
    static final FragmentHandler FRAGMENT_HANDLER = new FragmentAssembler(InfinispanAeronServer::onMessage);
    static final int FRAGMENT_LIMIT = 256;
@@ -83,13 +85,13 @@ public class InfinispanAeronServer {
 
       System.out.printf("[server, cache=%s] put(%s, %s)%n", cacheName, key, value);
 
-//      final ExpandableArrayBuffer buff = new ExpandableArrayBuffer(512);
-//
-//      EMPTY_ENCODER
-//         .wrapAndApplyHeader(buff, 0, MSG_HEADER_ENCODER);
-//
-//      long result = publication.offer(buff, 0, EMPTY_ENCODER.encodedLength());
-//      offerResult(result);
+      final ExpandableArrayBuffer buff = new ExpandableArrayBuffer(512);
+
+      EMPTY_ENCODER
+         .wrapAndApplyHeader(buff, 0, MSG_HEADER_ENCODER);
+
+      long result = PUBLICATION.offer(buff, 0, MSG_HEADER_ENCODER.encodedLength() + EMPTY_ENCODER.encodedLength());
+      offerResult(result);
    }
 
 //   private static byte[] decodeBytes(Supplier<Integer> lengthF, BiConsumer<byte[], Integer> bytesF) {

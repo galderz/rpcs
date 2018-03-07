@@ -2,7 +2,9 @@ package rcps.aeron.infinispan;
 
 import io.aeron.Aeron;
 import io.aeron.FragmentAssembler;
+import io.aeron.Image;
 import io.aeron.Publication;
+import io.aeron.Subscription;
 import io.aeron.logbuffer.FragmentHandler;
 import io.aeron.logbuffer.Header;
 import org.agrona.DirectBuffer;
@@ -15,15 +17,17 @@ import rcps.aeron.infinispan.codec.MessageHeaderEncoder;
 import rcps.aeron.infinispan.codec.ValueDecoder;
 
 import java.nio.charset.Charset;
+import java.util.concurrent.CountDownLatch;
 
 import static rcps.aeron.AeronUtils.offerResult;
+import static rcps.aeron.infinispan.Constants.REP_CHANNEL;
 import static rcps.aeron.infinispan.Constants.REQ_CHANNEL;
 import static rcps.aeron.infinispan.Constants.STREAM_ID;
 
 public class InfinispanAeronClient {
 
    private static final int FRAGMENT_LIMIT = 256;
-   
+
 //   static final int DEFAULT_RETRY_ATTEMPTS = 3;
 //
 //   static final IdleStrategy RETRY_IDLE_STRATEGY = new BusySpinIdleStrategy();
@@ -39,17 +43,20 @@ public class InfinispanAeronClient {
 
    static final FragmentHandler FRAGMENT_HANDLER = new FragmentAssembler(InfinispanAeronClient::onMessage);
 
-   static final Aeron AERON = Aeron.connect(new Aeron.Context());
+   static final Aeron AERON = Aeron.connect(
+      new Aeron.Context().availableImageHandler(InfinispanAeronClient::availableRepImageHandler)
+   );
+
    static final Publication PUBLICATION = AERON.addPublication(REQ_CHANNEL, STREAM_ID);
-//   static Subscription subscription;
+   static final Subscription SUBSCRIPTION = AERON.addSubscription(REP_CHANNEL, STREAM_ID);
+
+   private static final CountDownLatch LATCH = new CountDownLatch(1);
 
    public static void main(String[] args) throws InterruptedException {
-//      subscription = AERON.addSubscription(REP_CHANNEL, STREAM_ID);
-//      System.out.println("[client] Added subscription to response channel: " + REP_CHANNEL);
-//      System.out.println("[client] Subscription connected? " + subscription.isConnected());
-//      PUBLICATION = ;
-//      System.out.println("[client] Added PUBLICATION to request channel: " + REQ_CHANNEL);
-//      System.out.println("[client] Publication connected? " + PUBLICATION.isConnected());
+      LATCH.await();
+
+      Thread receiver = new Thread(new Receiver());
+      receiver.start();
 
       final Charset ch = Charset.forName("UTF-8");
       final byte[] key = "hello".getBytes(ch);
@@ -63,12 +70,15 @@ public class InfinispanAeronClient {
          .putKey(key, 0, key.length)
          .putValue(value, 0, value.length);
 
+      System.out.println("Req publication connected? " + PUBLICATION.isConnected());
       long result = PUBLICATION.offer(buff1, 0, MSG_HEADER_ENCODER.encodedLength() + KEY_VALUE_ENCODER.encodedLength());
       offerResult(result);
 
 //      subscription.poll(FRAGMENT_HANDLER, FRAGMENT_LIMIT);
 
-      Thread.sleep(2000);
+      while (true) {
+         Thread.sleep(1000);
+      }
 
 //      final ExpandableArrayBuffer buff2 = new ExpandableArrayBuffer(512);
 //
@@ -90,9 +100,9 @@ public class InfinispanAeronClient {
          case EmptyDecoder.TEMPLATE_ID:
             onEmpty(buffer, msgOffset, MSG_HEADER_DECODER.blockLength(), MSG_HEADER_DECODER.version());
             break;
-         case ValueDecoder.TEMPLATE_ID:
-            onValue(buffer, msgOffset, MSG_HEADER_DECODER.blockLength(), MSG_HEADER_DECODER.version());
-            break;
+//         case ValueDecoder.TEMPLATE_ID:
+//            onValue(buffer, msgOffset, MSG_HEADER_DECODER.blockLength(), MSG_HEADER_DECODER.version());
+//            break;
          default:
             throw new IllegalStateException("Unknown message template");
       }
@@ -100,7 +110,7 @@ public class InfinispanAeronClient {
 
    private static void onEmpty(DirectBuffer buffer, int offset, int length, int version) {
       EMPTY_DECODER.wrap(buffer, offset, length, version);
-      System.out.println("Put responded");
+      System.out.println("[client] put complete");
    }
 
    private static void onValue(DirectBuffer buffer, int offset, int length, int version) {
@@ -109,6 +119,28 @@ public class InfinispanAeronClient {
       final byte[] bytes = new byte[valueLength];
       VALUE_DECODER.getValue(bytes, 0, valueLength);
       System.out.printf("Get responded: %s%n", new String(bytes));
+   }
+
+   private static void availableRepImageHandler(Image image) {
+      final Subscription subscription = image.subscription();
+      System.out.format(
+         "Available image: channel=%s streamId=%d session=%d%n",
+         subscription.channel(), subscription.streamId(), image.sessionId());
+
+      if (STREAM_ID == subscription.streamId() && REP_CHANNEL.equals(subscription.channel())) {
+         LATCH.countDown();
+      }
+   }
+
+   private static class Receiver implements Runnable {
+
+      @Override
+      public void run() {
+         while (true) {
+            SUBSCRIPTION.poll(FRAGMENT_HANDLER, FRAGMENT_LIMIT);
+         }
+      }
+
    }
 
 }

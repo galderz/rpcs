@@ -61,9 +61,9 @@ public class InfinispanAeronServer {
          case KeyValueDecoder.TEMPLATE_ID:
             onKeyValue(buffer, msgOffset, MSG_HEADER_DECODER.blockLength(), MSG_HEADER_DECODER.version());
             break;
-//         case KeyDecoder.TEMPLATE_ID:
-//            onKey(buffer, msgOffset, MSG_HEADER_DECODER.blockLength(), MSG_HEADER_DECODER.version());
-//            break;
+         case KeyDecoder.TEMPLATE_ID:
+            onKey(buffer, msgOffset, MSG_HEADER_DECODER.blockLength(), MSG_HEADER_DECODER.version());
+            break;
          default:
             throw new IllegalStateException("Unknown message template: " + MSG_HEADER_DECODER.templateId());
       }
@@ -93,40 +93,39 @@ public class InfinispanAeronServer {
       offerResult(result);
    }
 
-//   private static byte[] decodeBytes(Supplier<Integer> lengthF, BiConsumer<byte[], Integer> bytesF) {
-//      final int length = lengthF.get();
-//      final byte[] bytes = new byte[length];
-//      bytesF.accept(bytes, length);
-//      return bytes;
-//   }
+   private static void onKey(DirectBuffer buffer, int offset, int length, int version) {
+      KEY_DECODER.wrap(buffer, offset, length, version);
 
-//   private static void onKey(DirectBuffer buffer, int offset, int length, int version) {
-//      KEY_DECODER.wrap(buffer, offset, length, version);
-//
-//      final byte[] keyBs = decodeBytes(
-//         () -> KEY_VALUE_DECODER.keyLength()
-//         , (bytes, l) -> KEY_VALUE_DECODER.getKey(bytes, 0, length)
-//      );
-//
-//      String key = new String(keyBs);
-//
-//      System.out.printf("[server] get(%s)%n", key);
-//
-//      final ExpandableArrayBuffer buff = new ExpandableArrayBuffer(512);
-//
-//      // TODO: Should come from cache
-//      final Charset ch = Charset.forName("UTF-8");
-//      final byte[] value = "world".getBytes(ch);
-//
-//      VALUE_ENCODER
-//         .wrapAndApplyHeader(buff, 0, MSG_HEADER_ENCODER)
-//         .putValue(value, 0, value.length);
-//
-//      long result = PUBLICATION.offer(buff, 0, VALUE_ENCODER.encodedLength());
-//      offerResult(result);
-//
-//      System.out.printf("[server] get(%s) replied with %s%n", key, new String(value));
-//   }
+      final String cacheName = KEY_DECODER.cacheName();
+
+      final int keyLength = KEY_DECODER.keyLength();
+      final byte[] keyBytes = new byte[keyLength];
+      KEY_DECODER.getKey(keyBytes, 0, keyLength);
+
+      System.out.printf(
+         "[server, cache=%s] get(%s)%n"
+         , cacheName
+         , Arrays.toString(keyBytes)
+      );
+
+      final ExpandableArrayBuffer buff = new ExpandableArrayBuffer(512);
+
+      final Charset ch = Charset.forName("UTF-8");
+      final byte[] value = "world".getBytes(ch);
+
+      VALUE_ENCODER
+         .wrapAndApplyHeader(buff, 0, MSG_HEADER_ENCODER)
+         .putValue(value, 0, value.length);
+
+      long result = PUBLICATION.offer(buff, 0, MSG_HEADER_ENCODER.encodedLength() + VALUE_ENCODER.encodedLength());
+      offerResult(result);
+
+      System.out.printf(
+         "[server] get(%s) replied with %s%n"
+         , Arrays.toString(keyBytes)
+         , Arrays.toString(value)
+      );
+   }
 
    private static class Receiver implements Runnable {
 

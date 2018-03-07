@@ -51,6 +51,8 @@ public class InfinispanAeronClient {
    static final Subscription SUBSCRIPTION = AERON.addSubscription(REP_CHANNEL, STREAM_ID);
 
    private static final CountDownLatch LATCH = new CountDownLatch(1);
+   private static final CountDownLatch PUT_COMPLETE = new CountDownLatch(1);
+   private static final CountDownLatch GET_COMPLETE = new CountDownLatch(1);
 
    public static void main(String[] args) throws InterruptedException {
       LATCH.await();
@@ -62,35 +64,32 @@ public class InfinispanAeronClient {
       final byte[] key = "hello".getBytes(ch);
       final byte[] value = "world".getBytes(ch);
 
-      final ExpandableArrayBuffer buff1 = new ExpandableArrayBuffer(512);
+      final ExpandableArrayBuffer buf = new ExpandableArrayBuffer(512);
 
       KEY_VALUE_ENCODER
-         .wrapAndApplyHeader(buff1, 0, MSG_HEADER_ENCODER)
+         .wrapAndApplyHeader(buf, 0, MSG_HEADER_ENCODER)
          .cacheName("test")
          .putKey(key, 0, key.length)
          .putValue(value, 0, value.length);
 
-      System.out.println("Req publication connected? " + PUBLICATION.isConnected());
-      long result = PUBLICATION.offer(buff1, 0, MSG_HEADER_ENCODER.encodedLength() + KEY_VALUE_ENCODER.encodedLength());
+      long result = PUBLICATION.offer(buf, 0, MSG_HEADER_ENCODER.encodedLength() + KEY_VALUE_ENCODER.encodedLength());
       offerResult(result);
 
-//      subscription.poll(FRAGMENT_HANDLER, FRAGMENT_LIMIT);
+      PUT_COMPLETE.await();
+
+      KEY_ENCODER
+         .wrapAndApplyHeader(buf, 0, MSG_HEADER_ENCODER)
+         .cacheName("test")
+         .putKey(key, 0, key.length);
+
+      result = PUBLICATION.offer(buf, 0, MSG_HEADER_ENCODER.encodedLength() + KEY_ENCODER.encodedLength());
+      offerResult(result);
+
+      GET_COMPLETE.await();
 
       while (true) {
          Thread.sleep(1000);
       }
-
-//      final ExpandableArrayBuffer buff2 = new ExpandableArrayBuffer(512);
-//
-//      KEY_ENCODER
-//         .wrapAndApplyHeader(buff2, 0, MSG_HEADER_ENCODER)
-//         .cacheName("test")
-//         .putKey(key, 0, key.length);
-//
-//      result = PUBLICATION.offer(buff2, (int) result, KEY_VALUE_ENCODER.encodedLength());
-//      offerResult(result);
-//
-//      SUBSCRIPTION.poll(FRAGMENT_HANDLER, FRAGMENT_LIMIT);
    }
 
    private static void onMessage(DirectBuffer buffer, int offset, int length, Header header) {
@@ -100,9 +99,9 @@ public class InfinispanAeronClient {
          case EmptyDecoder.TEMPLATE_ID:
             onEmpty(buffer, msgOffset, MSG_HEADER_DECODER.blockLength(), MSG_HEADER_DECODER.version());
             break;
-//         case ValueDecoder.TEMPLATE_ID:
-//            onValue(buffer, msgOffset, MSG_HEADER_DECODER.blockLength(), MSG_HEADER_DECODER.version());
-//            break;
+         case ValueDecoder.TEMPLATE_ID:
+            onValue(buffer, msgOffset, MSG_HEADER_DECODER.blockLength(), MSG_HEADER_DECODER.version());
+            break;
          default:
             throw new IllegalStateException("Unknown message template");
       }
@@ -111,6 +110,7 @@ public class InfinispanAeronClient {
    private static void onEmpty(DirectBuffer buffer, int offset, int length, int version) {
       EMPTY_DECODER.wrap(buffer, offset, length, version);
       System.out.println("[client] put complete");
+      PUT_COMPLETE.countDown();
    }
 
    private static void onValue(DirectBuffer buffer, int offset, int length, int version) {
@@ -118,14 +118,15 @@ public class InfinispanAeronClient {
       final int valueLength = VALUE_DECODER.valueLength();
       final byte[] bytes = new byte[valueLength];
       VALUE_DECODER.getValue(bytes, 0, valueLength);
-      System.out.printf("Get responded: %s%n", new String(bytes));
+      System.out.printf("[client] get(hello)=%s", new String(bytes));
+      GET_COMPLETE.countDown();
    }
 
    private static void availableRepImageHandler(Image image) {
       final Subscription subscription = image.subscription();
-      System.out.format(
-         "Available image: channel=%s streamId=%d session=%d%n",
-         subscription.channel(), subscription.streamId(), image.sessionId());
+      // System.out.format(
+      //   "Available image: channel=%s streamId=%d session=%d%n",
+      //   subscription.channel(), subscription.streamId(), image.sessionId());
 
       if (STREAM_ID == subscription.streamId() && REP_CHANNEL.equals(subscription.channel())) {
          LATCH.countDown();
